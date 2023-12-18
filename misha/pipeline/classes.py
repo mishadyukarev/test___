@@ -1,6 +1,7 @@
 import pandas as pd
 
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 class LowerText(BaseEstimator, TransformerMixin):
@@ -17,7 +18,7 @@ class LowerText(BaseEstimator, TransformerMixin):
 
 
 class CountAmountLettersInText(BaseEstimator, TransformerMixin):
-    def __init__(self, text_column, column_out):
+    def __init__(self, text_column: str, column_out: str):
         self.text_column = text_column
         self.column_out = column_out
 
@@ -30,29 +31,25 @@ class CountAmountLettersInText(BaseEstimator, TransformerMixin):
 
 
 class CountAmountEveryLetterInText(BaseEstimator, TransformerMixin):
-    def __init__(self, text_column, columns_out):
+    def __init__(self, text_column: str, columns_out: set):
         self.text_column = text_column
         self.columns_out = columns_out
-        self.needed_letters = self.columns_out
 
     def fit(self, x: pd.DataFrame, y=None):
         for i, text in enumerate(x[self.text_column]):
             for letter in text:
-                if letter not in self.needed_letters:
-                    self.needed_letters.append(letter)
+                if letter not in self.columns_out:
+                    self.columns_out.add(letter)
 
         return self
 
     def transform(self, x: pd.DataFrame):
-        n_every_letter_dic = {}
+        n_every_letter_dic = {key: [0] * len(x) for key in self.columns_out}
 
         for i, text in enumerate(x[self.text_column]):
             for letter in text:
-                if letter in self.needed_letters:
-                    if letter in n_every_letter_dic.keys():
-                        n_every_letter_dic[letter][i] += 1
-                    else:
-                        n_every_letter_dic[letter] = [0] * len(x)
+                if letter in self.columns_out:
+                    n_every_letter_dic[letter][i] += 1
 
         x = pd.concat([x, pd.DataFrame(n_every_letter_dic)], axis=1)
 
@@ -60,7 +57,7 @@ class CountAmountEveryLetterInText(BaseEstimator, TransformerMixin):
 
 
 class RemoveLessPopularFeatures(BaseEstimator, TransformerMixin):
-    def __init__(self, columns, border):
+    def __init__(self, columns: set, border: float):
         self.columns = columns
         self.border = border
 
@@ -75,21 +72,42 @@ class RemoveLessPopularFeatures(BaseEstimator, TransformerMixin):
 
         n_letters_vec = pd.Series(index=frequency_dic.keys(), data=frequency_dic.values())
         not_needed_columns = n_letters_vec[n_letters_vec < self.border].index
-        print(not_needed_columns)
+        print(f'not needed columns: {list(not_needed_columns)}')
         x.drop(columns=not_needed_columns, inplace=True)
 
         return x
 
 
 class DivideMatrixIntoVector(BaseEstimator, TransformerMixin):
-    def __init__(self, columns_divided, column_divides, columns_out):
-        self.columns_divided = columns_divided
+    def __init__(self, columns_divided: set, column_divides: str, columns_out: set):
+        self.columns_divided = list(columns_divided)
         self.column_divides = column_divides
-        self.columns_out = columns_out
+        self.columns_out = list(columns_out)
 
     def fit(self, x: pd.DataFrame, y=None):
         return self
 
     def transform(self, x: pd.DataFrame):
         x[self.columns_out] = x[self.columns_divided].div(x[self.column_divides], axis=0)
+        return x
+
+
+class TfidfVectorizerC(BaseEstimator, TransformerMixin):
+    def __init__(self, text_column: str, columns_out: set):
+        self.vect = TfidfVectorizer(ngram_range=(2, 5), max_features=1000, use_idf=False)
+        self.text_column = text_column
+        self.columns_out = columns_out
+
+    def fit(self, x: pd.DataFrame, y=None):
+        self.vect.fit(x[self.text_column])
+        feature_names_out = self.vect.get_feature_names_out()
+        for value in feature_names_out:
+            self.columns_out.add(value + '_tfidf')
+        return self
+
+    def transform(self, x: pd.DataFrame):
+        data = self.vect.transform(x[self.text_column]).toarray()
+        new_df = pd.DataFrame(columns=list(self.columns_out), data=data, index=x.index)
+        x = pd.concat([x, new_df], axis=1)
+
         return x

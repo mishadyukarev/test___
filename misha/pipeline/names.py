@@ -1,0 +1,2 @@
+class Columns:
+    TEXT = 'text'
