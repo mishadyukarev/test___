@@ -1,8 +1,22 @@
+import nltk
 from sklearn.feature_extraction.text import TfidfVectorizer
+from transformers import pipeline
 
 ################################################
 CREATE_FOR_SUBMISSION = False  # Change it only
 ################################################
+
+spend_time_for_transform_dic = {}
+
+#model_ref = NOTEBOOK_REF + name_of_emotional_model
+
+#emotional_classifier = pipeline("text-classification", model=model_ref, return_all_scores=True)
+
+#emotional_classifier = pipeline("text-classification",
+#                                model='j-hartmann/emotion-english-distilroberta-base',
+#                                return_all_scores=True)
+
+#nltk.download('punkt')
 
 # language_tool = language_tool_python.LanguageTool('en-US')
 

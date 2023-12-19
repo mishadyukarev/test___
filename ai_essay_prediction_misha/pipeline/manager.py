@@ -1,3 +1,5 @@
+import re
+
 import ai_essay_prediction_misha.pipeline.classes as classes
 import ai_essay_prediction_misha.pipeline.names as n
 
@@ -5,12 +7,22 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 from sklearn.pipeline import Pipeline
 
+from transformers import pipeline
+
+
 def create_main_pipeline(create_for_submission):
     # columns_tfidf_out = []
     n_every_letter_columns_set = set()
 
-    vectorizer_0 = TfidfVectorizer(ngram_range=(3, 5), max_features=500, use_idf=False)#
-    vectorizer_1 = TfidfVectorizer(ngram_range=(1, 2), max_features=500, use_idf=False)#, use_idf=False
+    # vectorizer = TfidfVectorizer(ngram_range=(4, 6), max_features=10000, use_idf=False)  # , use_idf=False
+
+    cols_reg_exp_1_set = set()
+    cols_reg_exp_2_set = set()
+    cols_reg_exp_3_set = set()
+    cols_reg_exp_4_set = set()
+    cols_reg_exp_5_set = set()
+    cols_reg_exp_6_set = set()
+    cols_reg_exp_7_set = set()
 
     pipeline_l = [
         # ('add_has_mistake_columns', AddHasMistakesColumns(language_tool, 'text', True, needed_fc_df.ruleId.tolist())),
@@ -21,16 +33,96 @@ def create_main_pipeline(create_for_submission):
         # ('create_extra_features', CreatorAdditionRegressionFeatures('corrected_text', 'amount_words', [])),
         # ('create_emotions', CreatorEmotionsFromSentences(emotional_classifier, 'sentences_corrected_text')),
 
-        ('lower_text', classes.LowerText(n.Columns.TEXT, n.Columns.LOWER_TEXT)),
-        ('count_amount_letters', classes.CountAmountLettersInText(n.Columns.LOWER_TEXT, 'n_letters')),
-        ('count_amount_every_letter',
-         classes.CountAmountEveryLetterInText(n.Columns.LOWER_TEXT, n_every_letter_columns_set)),
-        ('divide_matrix_into_vector',
-         classes.DivideMatrixIntoVector(n_every_letter_columns_set, 'n_letters', n_every_letter_columns_set)),
-        ('remove_less_popular_features', classes.RemoveLessPopularFeatures(n_every_letter_columns_set, 0.4)),
+        ('lower_text',
+         classes.LowerText(n.Columns.TEXT,
+                           n.Columns.CORRECTED_TEXT)),
 
-        ('tfidf_vectorizer_0', classes.TfidfVectorizerC(vectorizer_0, n.Columns.LOWER_TEXT, set())),
-        ('tfidf_vectorizer_1', classes.TfidfVectorizerC(vectorizer_1, n.Columns.LOWER_TEXT, set())),
+        ('count_amount_letters',
+         classes.CountAmountLettersInText(n.Columns.CORRECTED_TEXT,
+                                          'n_letters')),
+
+        ('count_amount_every_letter',
+         classes.CountAmountEveryLetterInText(n.Columns.CORRECTED_TEXT,
+                                              n_every_letter_columns_set)),
+
+        # ('remove_less_popular_features',
+        # classes.RemoveLessPopularFeatures(n_every_letter_columns_set, 0.4)),
+
+        # ('tfidf_vectorizer', classes.TfidfVectorizerC(vectorizer, n.Columns.CORRECTED_TEXT, set())),
+
+        ('separating_text_into_sentences',
+         classes.SeparatingTextIntoSentences(n.Columns.CORRECTED_TEXT,
+                                             n.Columns.SENTENCES_CORRECTED_TEXT)),
+
+        # ('create_emotions', classes.CreatorEmotionsFromSentences(n.Columns.SENTENCES_CORRECTED_TEXT)),
+        ('create_n_words',
+         classes.CreateAmountSentences(n.Columns.SENTENCES_CORRECTED_TEXT,
+                                       'n_sentences')),
+
+        # ('s1',
+        # classes.UserRegExp(n.Columns.CORRECTED_TEXT,
+        #                   re.compile(r"[a-zA-Z]+([a-z])\W"),
+        #                   cols_reg_exp_1_set)),
+
+        ('s2',
+         classes.UserRegExp(n.Columns.CORRECTED_TEXT,
+                            re.compile(r"[a-z]+([a-z]{2})\W"),
+                            cols_reg_exp_2_set, '_0')),
+
+        ('s3',
+         classes.UserRegExp(n.Columns.CORRECTED_TEXT,
+                            re.compile(r"[a-z]+([a-z]{3})\W"),
+                            cols_reg_exp_3_set, '_1')),
+
+        ('4',
+         classes.UserRegExp(n.Columns.CORRECTED_TEXT,
+                            re.compile(r"([a-z]\W[a-z])"),
+                            cols_reg_exp_4_set, '_2')),
+
+        ('finding_word_with_one_letter',
+         classes.UserRegExp(n.Columns.CORRECTED_TEXT,
+                            re.compile(r"\W(\w)\W"),
+                            cols_reg_exp_5_set, '_3')),
+
+        ('5',
+         classes.UserRegExp(n.Columns.CORRECTED_TEXT,
+                            re.compile(r"\W(\w{2})\W"),
+                            cols_reg_exp_6_set, '_4')),
+
+        ('6',
+         classes.UserRegExp(n.Columns.CORRECTED_TEXT,
+                            re.compile(r"['\"]\w\s"),
+                            cols_reg_exp_7_set, '_6')),
+
+        ('divide_matrix_into_vector',
+         classes.DivideMatrixIntoVector([n_every_letter_columns_set,
+                                         cols_reg_exp_2_set,
+                                         cols_reg_exp_3_set,
+                                         cols_reg_exp_4_set,
+                                         cols_reg_exp_5_set,
+                                         cols_reg_exp_6_set,
+                                         cols_reg_exp_7_set
+                                         ],
+                                        'n_letters',
+                                        [n_every_letter_columns_set,
+                                         cols_reg_exp_2_set,
+                                         cols_reg_exp_3_set,
+                                         cols_reg_exp_4_set,
+                                         cols_reg_exp_5_set,
+                                         cols_reg_exp_6_set,
+                                         cols_reg_exp_7_set
+                                         ])),
+
+        ('drop',
+         classes.DropperColumns({n.Columns.SENTENCES_CORRECTED_TEXT, 'n_sentences', 'n_letters'})),
+    ]
+
+    return Pipeline(pipeline_l)
+
+
+def create_cleaning_outliers_pipeline():
+    pipeline_l = [
+
     ]
 
     return Pipeline(pipeline_l)
