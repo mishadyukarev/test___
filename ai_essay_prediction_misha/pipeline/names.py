@@ -1,4 +1,5 @@
-class Columns:
-    TEXT = 'text'
-    CORRECTED_TEXT = 'corrected_text'
-    SENTENCES_CORRECTED_TEXT = 'sentences_corrected_text'
+from collections import namedtuple
+
+Columns = namedtuple \
+    ('Constants', ['TEXT', 'CORRECTED_TEXT', 'SENTENCES_CORRECTED_TEXT']) \
+    ('text', 'corrected_text', 'sentences_corrected_text')

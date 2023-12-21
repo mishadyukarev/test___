@@ -3,132 +3,144 @@ from typing import AnyStr
 
 import numpy as np
 import pandas as pd
+from IPython.core.display import display
+
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from ai_essay_prediction_misha.pipeline import wrappers
-from ai_essay_prediction_misha.pipeline import entities_data
+from ai_essay_prediction_misha.pipeline import wrappers, entities_data
+from ai_essay_prediction_misha.pipeline.abstract_classes import TextColumnOutWorker, TextColumnsOutWorker
 
 from nltk.tokenize import sent_tokenize
 
 from collections import Counter
 
 
-class LowerText(BaseEstimator, TransformerMixin):
-    def __init__(self, text_column: str, column_out: str):
-        self.text_column = text_column
-        self.column_out = column_out
+class LowerText(TextColumnOutWorker, BaseEstimator, TransformerMixin):
+    def __init__(self, _column_text: str, _column_out: str):
+        super().__init__(_column_text, _column_out)
 
     def fit(self, x: pd.DataFrame, y=None):
         return self
 
     @wrappers.timed
-    def transform(self, x: pd.DataFrame):
-        x[self.column_out] = x[self.text_column].apply(lambda v: v.lower())
+    def transform(self, x: pd.DataFrame) -> pd.DataFrame:
+        x[self._column_out] = x[self._column_text].apply(lambda v: v.lower())
         return x
 
 
-class CountAmountLettersInText(BaseEstimator, TransformerMixin):
-    def __init__(self, text_column: str, column_out: str):
-        self.text_column = text_column
-        self.column_out = column_out
+class CountAmountLettersInText(TextColumnOutWorker, BaseEstimator, TransformerMixin):
+    def __init__(self, _column_text: str, _column_out: str):
+        super().__init__(_column_text, _column_out)
 
     def fit(self, x: pd.DataFrame, y=None):
         return self
 
     @wrappers.timed
-    def transform(self, x: pd.DataFrame):
-        x[self.column_out] = x[self.text_column].apply(lambda v: len(v))
+    def transform(self, x: pd.DataFrame) -> pd.DataFrame:
+        x[self._column_out] = x[self._column_text].apply(lambda v: len(v))
         return x
 
 
-class CountAmountEveryLetterInText(BaseEstimator, TransformerMixin):
-    def __init__(self, text_column: str, columns_out: set):
-        self.text_column = text_column
-        self.columns_out = columns_out
+class CountAmountEveryLetterInText(TextColumnsOutWorker, BaseEstimator, TransformerMixin):
+    def __init__(self, _column_text: str, _columns_out: set):
+        super().__init__(_column_text, _columns_out)
 
     def fit(self, x: pd.DataFrame, y=None):
-        for i, text in enumerate(x[self.text_column]):
+        for text in x[self._column_text]:
             for letter in text:
-                if letter not in self.columns_out:
-                    self.columns_out.add(letter)
-
+                if letter not in self._columns_out:
+                    self._columns_out.add(letter)
         return self
 
     @wrappers.timed
-    def transform(self, x: pd.DataFrame):
-        n_every_letter_dic = {key: [0] * len(x) for key in self.columns_out}
+    def transform(self, x: pd.DataFrame) -> pd.DataFrame:
+        n_every_letter_dic = {key: np.zeros(len(x)) for key in self._columns_out}
 
-        for i, text in enumerate(x[self.text_column]):
+        for i, text in enumerate(x[self._column_text]):
             for letter in text:
-                if letter in self.columns_out:
+                if letter in self._columns_out:
                     n_every_letter_dic[letter][i] += 1
 
-        x = pd.concat([x, pd.DataFrame(n_every_letter_dic)], axis=1)
+        x = pd.concat([x, pd.DataFrame(n_every_letter_dic, index=x.index)], axis=1)
 
         return x
 
 
 class RemoveLessPopularFeatures(BaseEstimator, TransformerMixin):
-    def __init__(self, columns: set, border: float):
-        self.columns = columns
-        self.border = border
+    def __init__(self, __columns: set, __border: float, __columns_stayed: set):
+        self.__columns = __columns
+        self.__border = __border
+        self.__columns_stayed = __columns_stayed
 
     def fit(self, x: pd.DataFrame, y=None):
+        self.__columns = tuple(self.__columns)
         return self
 
     @wrappers.timed
     def transform(self, x: pd.DataFrame):
         frequency_dic = {}
 
-        for column in self.columns:
+        for column in self.__columns:
             frequency_dic[column] = sum(x[column].apply(lambda v: int(v > 0))) / len(x)
 
         n_letters_vec = pd.Series(index=frequency_dic.keys(), data=frequency_dic.values())
-        not_needed_columns = n_letters_vec[n_letters_vec < self.border].index
-        print(f'not needed columns: {list(not_needed_columns)}')
-        x.drop(columns=not_needed_columns, inplace=True)
+        not_needed_columns = set(n_letters_vec[n_letters_vec < self.__border].index)
+        print(f'not needed columns: {not_needed_columns}')
+        x.drop(columns=list(not_needed_columns), inplace=True)
 
+        for value in set(self.__columns) - not_needed_columns:
+            self.__columns_stayed.add(value)
         return x
 
 
 class DivideMatrixIntoVector(BaseEstimator, TransformerMixin):
-    def __init__(self, columns_divided: list, column_divides: str, columns_out: list):
-        print('sss')
-        self.columns_divided = columns_divided
-        self.column_divides = column_divides
-        self.columns_out = columns_out
+    def __init__(self, __columns_divided: set[str], __column_divides: str, __columns_out: set[str]):
+        self.__columns_divided = __columns_divided
+        self.__column_divides = __column_divides
+        self.__columns_out = __columns_out
 
     def fit(self, x: pd.DataFrame, y=None):
+        self.__columns_divided = tuple(self.__columns_divided)
+        self.__columns_out = tuple(self.__columns_out)
         return self
 
     @wrappers.timed
-    def transform(self, x: pd.DataFrame):
-        self.columns_divided = set.union(*self.columns_divided)
-        self.columns_out = set.union(*self.columns_out)
-
-        x[list(self.columns_out)] = x[list(self.columns_divided)].div(x[self.column_divides], axis=0)
+    def transform(self, x: pd.DataFrame) -> pd.DataFrame:
+        x[np.array(self.__columns_out)] = x[np.array(self.__columns_divided)].div(x[self.__column_divides], axis=0)
         return x
 
 
-class TfidfVectorizerC(BaseEstimator, TransformerMixin):
-    def __init__(self, vect, text_column: str, columns_out: set):
-        self.vect = vect
-        self.text_column = text_column
-        self.columns_out = columns_out
+class DropperColumns(BaseEstimator, TransformerMixin):
+    def __init__(self, __columns_to_drop: set[str]):
+        self.__columns_to_drop = __columns_to_drop
 
     def fit(self, x: pd.DataFrame, y=None):
-        self.vect.fit(x[self.text_column])
-        feature_names_out = self.vect.get_feature_names_out()
+        return self
+
+    @wrappers.timed
+    def transform(self, x: pd.DataFrame) -> pd.DataFrame:
+        return x.drop(columns=list(self.__columns_to_drop))
+
+
+
+class TfidfVectorizerC(TextColumnsOutWorker, BaseEstimator, TransformerMixin):
+    def __init__(self, vect, _column_text: str, _columns_out: set):
+        super().__init__(_column_text, _columns_out)
+        self.__vect = vect
+
+    def fit(self, x: pd.DataFrame, y=None):
+        self.__vect.fit(x[self._column_text])
+        feature_names_out = self.__vect.get_feature_names_out()
         for value in feature_names_out:
-            self.columns_out.add(value + '_tfidf')
+            self._columns_out.add(value + '_tfidf')
         return self
 
     @wrappers.timed
     def transform(self, x: pd.DataFrame):
-        data = self.vect.transform(x[self.text_column]).toarray()
-        new_df = pd.DataFrame(columns=list(self.columns_out), data=data, index=x.index)
+        data = self.__vect.transform(x[self._column_text]).toarray()
+        new_df = pd.DataFrame(columns=list(self._columns_out), data=data, index=x.index)
         x = pd.concat([x, new_df], axis=1)
 
         return x
@@ -220,18 +232,6 @@ class CreateAmountSentences(BaseEstimator, TransformerMixin):
         return x
 
 
-class DropperColumns(BaseEstimator, TransformerMixin):
-    def __init__(self, columns_to_drop: set):
-        self.columns_to_drop = columns_to_drop
-
-    def fit(self, x: pd.DataFrame, y=None):
-        return self
-
-    @wrappers.timed
-    def transform(self, x: pd.DataFrame):
-        return x.drop(columns=list(self.columns_to_drop))
-
-
 class UserRegExp(BaseEstimator, TransformerMixin):
     def __init__(self, column_text: str, reg_exp: re.Pattern[AnyStr], columns_out: set, suffix: str):
         self.column_text = column_text
@@ -261,7 +261,66 @@ class UserRegExp(BaseEstimator, TransformerMixin):
         return x
 
 
-class ChooserCorrelatedFeature(BaseEstimator, TransformerMixin):
+class CreatorColumnsByUsingManyRegularExpressions(TextColumnsOutWorker, BaseEstimator, TransformerMixin):
+    def __init__(self, _column_text: str, __patterns_reg_exp: set[re.Pattern[AnyStr]], _columns_out: set):
+        super().__init__(_column_text=_column_text, _columns_out=_columns_out)
+        self.__patterns_reg_exp = __patterns_reg_exp
+
+    def fit(self, x: pd.DataFrame, y=None):
+        return self
+
+    @wrappers.timed
+    def transform(self, x: pd.DataFrame):
+        for i_pattern, pattern in enumerate(self.__patterns_reg_exp):
+            name_new_column = f'pattern_{i_pattern}_{pattern.pattern}'
+            self._columns_out.add(name_new_column)
+            x[name_new_column] = x[self._column_text].apply(lambda v: pattern.findall(v))
+        return x
+
+
+class Create(TextColumnsOutWorker, BaseEstimator, TransformerMixin):
+    def __init__(self, __columns, _column_text: str, _columns_out: set):
+        super().__init__(_column_text, _columns_out)
+        self.__columns = __columns
+
+    def fit(self, x: pd.DataFrame, y=None):
+        return self
+
+    @wrappers.timed
+    def transform(self, x: pd.DataFrame):
+        result_dic = {}
+        for i_column, vec_column in enumerate(self.__columns):
+            vec_of_vec = x[vec_column]
+
+            for i_row, row_value_l in enumerate(vec_of_vec):
+                for key, value in dict(Counter(row_value_l)).items():
+                    result_key = key + f'_{i_column}'
+                    if result_key not in result_dic.keys():
+                        result_dic[result_key] = np.zeros(len(x))
+                        self._columns_out.add(result_key)
+                    result_dic[result_key][i_row] = value
+
+        x = pd.concat([x, pd.DataFrame(result_dic, index=x.index)], axis=1)
+
+        return x
+
+
+'''        for reg_exp_pattern in self.patterns_reg_exp:
+            vec_of_vec = x[self.column_text].apply(lambda v: re.findall(reg_exp_pattern, v))
+            result_dic = {}
+
+            for i_element, element in enumerate(vec_of_vec):
+                for key, value in dict(Counter(element)).items():
+                    result_key = key + self.suffix
+                    if key not in result_dic.keys():
+                        result_dic[result_key] = np.zeros(len(vec_of_vec))
+                        self.columns_out.add(result_key)
+
+                    result_dic[result_key][i_element] = value
+
+            x = pd.concat([x, pd.DataFrame(result_dic)], axis=1)'''
+
+'''class ChooserCorrelatedFeature(BaseEstimator, TransformerMixin):
     def __init__(self, columns: tuple, border: tuple = (-0.2, 0.2)):
         self.columns = columns
         self.border = border
@@ -277,4 +336,4 @@ class ChooserCorrelatedFeature(BaseEstimator, TransformerMixin):
         needed_columns = cor_vec[(cor_vec < borders[0]) | (cor_vec > borders[1])].index
         needed_columns
 
-        return x
+        return x''';

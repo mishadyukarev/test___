@@ -10,19 +10,20 @@ from sklearn.pipeline import Pipeline
 from transformers import pipeline
 
 
+
 def create_main_pipeline(create_for_submission):
     # columns_tfidf_out = []
     n_every_letter_columns_set = set()
 
     # vectorizer = TfidfVectorizer(ngram_range=(4, 6), max_features=10000, use_idf=False)  # , use_idf=False
 
-    cols_reg_exp_1_set = set()
-    cols_reg_exp_2_set = set()
-    cols_reg_exp_3_set = set()
-    cols_reg_exp_4_set = set()
-    cols_reg_exp_5_set = set()
-    cols_reg_exp_6_set = set()
-    cols_reg_exp_7_set = set()
+    reg_expressions_l = {
+        re.compile(r"[a-z]+([a-z]{2})\W"),
+        re.compile(r"[a-z]+([a-z]{3})\W"),
+        re.compile(r"([a-z]\W[a-z])"),
+    }
+
+    classes.UserManyRegExp('', reg_expressions_l, set())
 
     pipeline_l = [
         # ('add_has_mistake_columns', AddHasMistakesColumns(language_tool, 'text', True, needed_fc_df.ruleId.tolist())),
@@ -64,7 +65,26 @@ def create_main_pipeline(create_for_submission):
         #                   re.compile(r"[a-zA-Z]+([a-z])\W"),
         #                   cols_reg_exp_1_set)),
 
-        ('s2',
+    ]
+
+    pipeline_l += [
+        ('reg_expr', classes.UserManyRegExp(n.Columns.CORRECTED_TEXT, reg_expressions_l, ))
+    ]
+
+
+
+    return Pipeline(pipeline_l)
+
+
+def create_cleaning_outliers_pipeline():
+    pipeline_l = [
+
+    ]
+
+    return Pipeline(pipeline_l)
+
+
+'''        ('s2',
          classes.UserRegExp(n.Columns.CORRECTED_TEXT,
                             re.compile(r"[a-z]+([a-z]{2})\W"),
                             cols_reg_exp_2_set, '_0')),
@@ -92,37 +112,22 @@ def create_main_pipeline(create_for_submission):
         ('6',
          classes.UserRegExp(n.Columns.CORRECTED_TEXT,
                             re.compile(r"['\"]\w\s"),
-                            cols_reg_exp_7_set, '_6')),
+                            cols_reg_exp_7_set, '_6')),'''
 
-        ('divide_matrix_into_vector',
-         classes.DivideMatrixIntoVector([n_every_letter_columns_set,
-                                         cols_reg_exp_2_set,
-                                         cols_reg_exp_3_set,
-                                         cols_reg_exp_4_set,
-                                         cols_reg_exp_5_set,
-                                         cols_reg_exp_6_set,
-                                         cols_reg_exp_7_set
-                                         ],
-                                        'n_letters',
-                                        [n_every_letter_columns_set,
-                                         cols_reg_exp_2_set,
-                                         cols_reg_exp_3_set,
-                                         cols_reg_exp_4_set,
-                                         cols_reg_exp_5_set,
-                                         cols_reg_exp_6_set,
-                                         cols_reg_exp_7_set
-                                         ])),
+'''pipeline_l += [
+    ('remove_less_popular_features',
+     classes.RemoveLessPopularFeatures(set.union(*reg_exp_out_l), 0.4)),
+]
 
-        ('drop',
-         classes.DropperColumns({n.Columns.SENTENCES_CORRECTED_TEXT, 'n_sentences', 'n_letters'})),
-    ]
+pipeline_l += [('divide_matrix_into_vector',
+                classes.DivideMatrixIntoVector([n_every_letter_columns_set,
+                                                set.union(*reg_exp_out_l),
+                                                ],
+                                               'n_letters',
+                                               [n_every_letter_columns_set,
+                                                set.union(*reg_exp_out_l),
+                                                ])),
 
-    return Pipeline(pipeline_l)
-
-
-def create_cleaning_outliers_pipeline():
-    pipeline_l = [
-
-    ]
-
-    return Pipeline(pipeline_l)
+               ('drop',
+                classes.DropperColumns({n.Columns.SENTENCES_CORRECTED_TEXT, 'n_sentences', 'n_letters'})),
+               ]'''
