@@ -1,10 +1,9 @@
 import re
-from typing import AnyStr
+from typing import AnyStr, Final
 
 import numpy as np
 import pandas as pd
 from IPython.core.display import display
-
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -16,7 +15,10 @@ from nltk.tokenize import sent_tokenize
 
 from collections import Counter
 
+from overrides import final
 
+
+@final
 class LowerText(TextColumnOutWorker, BaseEstimator, TransformerMixin):
     def __init__(self, _column_text: str, _column_out: str):
         super().__init__(_column_text, _column_out)
@@ -30,6 +32,7 @@ class LowerText(TextColumnOutWorker, BaseEstimator, TransformerMixin):
         return x
 
 
+@final
 class CountAmountLettersInText(TextColumnOutWorker, BaseEstimator, TransformerMixin):
     def __init__(self, _column_text: str, _column_out: str):
         super().__init__(_column_text, _column_out)
@@ -43,6 +46,7 @@ class CountAmountLettersInText(TextColumnOutWorker, BaseEstimator, TransformerMi
         return x
 
 
+@final
 class CountAmountEveryLetterInText(TextColumnsOutWorker, BaseEstimator, TransformerMixin):
     def __init__(self, _column_text: str, _columns_out: set):
         super().__init__(_column_text, _columns_out)
@@ -68,6 +72,7 @@ class CountAmountEveryLetterInText(TextColumnsOutWorker, BaseEstimator, Transfor
         return x
 
 
+@final
 class RemoveLessPopularFeatures(BaseEstimator, TransformerMixin):
     def __init__(self, __columns: set, __border: float, __columns_stayed: set):
         self.__columns = __columns
@@ -80,6 +85,8 @@ class RemoveLessPopularFeatures(BaseEstimator, TransformerMixin):
 
     @wrappers.timed
     def transform(self, x: pd.DataFrame):
+        ####################################################### Redo
+
         frequency_dic = {}
 
         for column in self.__columns:
@@ -95,6 +102,7 @@ class RemoveLessPopularFeatures(BaseEstimator, TransformerMixin):
         return x
 
 
+@final
 class DivideMatrixIntoVector(BaseEstimator, TransformerMixin):
     def __init__(self, __columns_divided: set[str], __column_divides: str, __columns_out: set[str]):
         self.__columns_divided = __columns_divided
@@ -112,6 +120,7 @@ class DivideMatrixIntoVector(BaseEstimator, TransformerMixin):
         return x
 
 
+@final
 class DropperColumns(BaseEstimator, TransformerMixin):
     def __init__(self, __columns_to_drop: set[str]):
         self.__columns_to_drop = __columns_to_drop
@@ -124,7 +133,7 @@ class DropperColumns(BaseEstimator, TransformerMixin):
         return x.drop(columns=list(self.__columns_to_drop))
 
 
-
+@final
 class TfidfVectorizerC(TextColumnsOutWorker, BaseEstimator, TransformerMixin):
     def __init__(self, vect, _column_text: str, _columns_out: set):
         super().__init__(_column_text, _columns_out)
@@ -146,6 +155,7 @@ class TfidfVectorizerC(TextColumnsOutWorker, BaseEstimator, TransformerMixin):
         return x
 
 
+@final
 class SeparatingTextIntoSentences(BaseEstimator, TransformerMixin):
     def __init__(self, text_column: str, column_out: str):
         self.text_column = text_column
